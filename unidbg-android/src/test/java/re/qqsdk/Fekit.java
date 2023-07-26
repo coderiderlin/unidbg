@@ -36,7 +36,7 @@ public class Fekit {
     private final VM vm;
     private final Module module;
 
-    private final DvmClass TTEncryptUtils;
+    private final DvmClass FF;
 
     private final boolean logging;
 
@@ -44,8 +44,8 @@ public class Fekit {
     {
         this.logging = true;
 
-        emulator = AndroidEmulatorBuilder.for32Bit()
-                .setProcessName("com.qidian.dldl.official")
+        emulator = AndroidEmulatorBuilder.for64Bit()
+                .setProcessName("com.tencent.qqmobile")
                 .addBackendFactory(new Unicorn2Factory(true))
                 .build(); // 创建模拟器实例，要模拟32位或者64位，在这里区分
         final Memory memory = emulator.getMemory(); // 模拟器的内存操作接口
@@ -53,13 +53,21 @@ public class Fekit {
 
         vm = emulator.createDalvikVM(); // 创建Android虚拟机
         vm.setVerbose(logging); // 设置是否打印Jni调用细节
-        DalvikModule dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/example_binaries/libttEncrypt.so"), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
+        DalvikModule dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re.qqsdk/libfekit.so"), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
         dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
         module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
-
-
+        FF = vm.resolveClass("com/bytedance/frameworks/core/encrypt/TTEncryptUtils");
     }
+
+
     public static void main(String[] args) throws Exception {
 
+        Fekit fekit=new Fekit();
+        fekit.getSign();
+    }
+
+    private String getSign() {
+
+        return "test";
     }
 }
