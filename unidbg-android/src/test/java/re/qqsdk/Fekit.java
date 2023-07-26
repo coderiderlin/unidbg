@@ -1,73 +1,55 @@
 package re.qqsdk;
 
-import com.alibaba.fastjson.util.IOUtils;
 import com.github.unidbg.AndroidEmulator;
-import com.github.unidbg.Emulator;
 import com.github.unidbg.Module;
-import com.github.unidbg.Symbol;
-import com.github.unidbg.arm.HookStatus;
-import com.github.unidbg.arm.backend.Unicorn2Factory;
-import com.github.unidbg.arm.context.Arm32RegisterContext;
-import com.github.unidbg.arm.context.RegisterContext;
-import com.github.unidbg.debugger.DebuggerType;
-import com.github.unidbg.hook.HookContext;
-import com.github.unidbg.hook.ReplaceCallback;
-import com.github.unidbg.hook.hookzz.Dobby;
-import com.github.unidbg.hook.hookzz.HookEntryInfo;
-import com.github.unidbg.hook.hookzz.HookZz;
-import com.github.unidbg.hook.hookzz.IHookZz;
-import com.github.unidbg.hook.hookzz.InstrumentCallback;
-import com.github.unidbg.hook.hookzz.WrapCallback;
-import com.github.unidbg.hook.xhook.IxHook;
 import com.github.unidbg.linux.android.AndroidEmulatorBuilder;
 import com.github.unidbg.linux.android.AndroidResolver;
-import com.github.unidbg.linux.android.XHookImpl;
+import com.github.unidbg.linux.android.dvm.AbstractJni;
 import com.github.unidbg.linux.android.dvm.DalvikModule;
-import com.github.unidbg.linux.android.dvm.DvmClass;
 import com.github.unidbg.linux.android.dvm.VM;
-import com.github.unidbg.linux.android.dvm.array.ByteArray;
 import com.github.unidbg.memory.Memory;
-import com.github.unidbg.utils.Inspector;
-import com.sun.jna.Pointer;
 
 import java.io.File;
-public class Fekit {
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.PrintStream;
+
+public class Fekit extends AbstractJni {
     private final AndroidEmulator emulator;
     private final VM vm;
     private final Module module;
 
-    private final DvmClass FF;
-
-    private final boolean logging;
-
-    Fekit()
-    {
-        this.logging = true;
-
-        emulator = AndroidEmulatorBuilder.for64Bit()
-                .setProcessName("com.tencent.qqmobile")
-                .addBackendFactory(new Unicorn2Factory(true))
-                .build(); // 创建模拟器实例，要模拟32位或者64位，在这里区分
-        final Memory memory = emulator.getMemory(); // 模拟器的内存操作接口
-        memory.setLibraryResolver(new AndroidResolver(23)); // 设置系统类库解析
-
-        vm = emulator.createDalvikVM(); // 创建Android虚拟机
-        vm.setVerbose(logging); // 设置是否打印Jni调用细节
-        DalvikModule dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re.qqsdk/libfekit.so"), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
-        dm.callJNI_OnLoad(emulator); // 手动执行JNI_OnLoad函数
-        module = dm.getModule(); // 加载好的libttEncrypt.so对应为一个模块
-        FF = vm.resolveClass("com/bytedance/frameworks/core/encrypt/TTEncryptUtils");
+    Fekit(){
+        // 创建一个模拟器实例,进程名建议依照实际的进程名填写，可以规避一些so中针对进程名校验
+        emulator = AndroidEmulatorBuilder.for64Bit().setProcessName("com.sina.oasis").build();
+        // 设置模拟器的内存操作接口
+        final Memory memory = emulator.getMemory();
+        // 设置系统类库解析
+        memory.setLibraryResolver(new AndroidResolver(23));
+        // 创建Android虚拟机,传入APK,Unidbg可以替我们做部分签名校验的工作
+        vm = emulator.createDalvikVM(new File("unidbg-android/src/test/resources/re/qqsdk/com.tencent.mobileqq_v8.9.70.apk"));
+        // 加载so到虚拟内存,第二个参数的意思表示是否执行动态库的初始化代码
+        DalvikModule dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/qqsdk/libfekit.so"),true);
+        // 获取so模块的句柄
+        module = dm.getModule();
+        // 设置JNI
+        vm.setJni(this);
+        // 打印日志
+        vm.setVerbose(true);
+        // 调用JNI方法
+//        emulator.traceCode(dm.getModule().base,dm.getModule().base+dm.getModule().size);
+        int func_start = 0x62880;
+        int func_end = 0x75074;
+        try {
+            emulator.traceCode(dm.getModule().base+func_start,dm.getModule().base+func_end)
+                    .setRedirect(new PrintStream(new FileOutputStream("unidbg-android/src/test/resources/re/qqsdk/trace1.log"),true));
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        dm.callJNI_OnLoad(emulator);;   // 调用JNI_OnLoad
     }
 
-
-    public static void main(String[] args) throws Exception {
-
-        Fekit fekit=new Fekit();
-        fekit.getSign();
-    }
-
-    private String getSign() {
-
-        return "test";
+    public static void main(String[] args){
+        Fekit fekit = new Fekit();
     }
 }

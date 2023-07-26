@@ -18,7 +18,7 @@ public class TTEncrypt extends AbstractJni {
     private final Module module;
     private final DvmClass TTEncryptUtils;
 
-    public String apkPath = "unidbg-android/src/test/resources/re.tt/jrtt_742.apk";
+    public String apkPath = "unidbg-android/src/test/resources/re/tt/jrtt_742.apk";
 
     TTEncrypt() {
         emulator = AndroidEmulatorBuilder.for32Bit().build();
@@ -27,18 +27,20 @@ public class TTEncrypt extends AbstractJni {
 //        vm = emulator.createDalvikVM(new File(apkPath));
         vm = emulator.createDalvikVM();
 //        DalvikModule dm = vm.loadLibrary("ttEncrypt", true);
-        DalvikModule dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re.tt/libttEncrypt.so"), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
+        DalvikModule dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/tt/libttEncrypt.so"), false); // 加载libttEncrypt.so到unicorn虚拟内存，加载成功以后会默认调用init_array等函数
 
         module = dm.getModule();
+        emulator.traceCode();
         vm.setVerbose(true);
         vm.setJni(this);
 //        dm.callJNI_OnLoad(emulator);
 
         TTEncryptUtils = vm.resolveClass("com/bytedance/frameworks/core/encrypt/TTEncryptUtils");
+        dm.callJNI_OnLoad(emulator);
         System.out.println("TTEncryptUtils:"+TTEncryptUtils);
     }
 
-    public void callFunction() {
+    public void call_ttEncrypt() {
         String input = "test";
 
         ByteArray result = TTEncryptUtils.callStaticJniMethodObject(
@@ -53,7 +55,8 @@ public class TTEncrypt extends AbstractJni {
 
     public static void main(String[] args) {
         TTEncrypt ttEncrypt = new TTEncrypt();
-        ttEncrypt.callFunction();
+//        ttEncrypt.call_ttEncrypt();
+
         ttEncrypt.destroy();
     }
 
