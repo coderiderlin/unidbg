@@ -18,3 +18,4 @@
 /unidbg-ios/src/test/resources/native/swift/swift_library.o
 /unidbg-ios/src/test/resources/native/swift/swift_library-Swift.h
 *.ipa
+**/resources/
