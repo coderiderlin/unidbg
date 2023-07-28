@@ -44,7 +44,7 @@ public class Oasis extends AbstractJni {
         // 调用JNI方法
         try {
             emulator.traceCode(dm.getModule().base,dm.getModule().base+dm.getModule().size)
-                    .setRedirect(new PrintStream(new FileOutputStream("unidbg-android/src/test/resources/re/lvzhou/trace1.log"),true));
+                    .setRedirect(new PrintStream(new FileOutputStream("unidbg-android/src/test/resources/re/lvzhou/trace1.bak.log"),true));
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
