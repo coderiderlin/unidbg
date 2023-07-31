@@ -2,6 +2,7 @@ package re.qqsdk;
 
 import com.github.unidbg.AndroidEmulator;
 import com.github.unidbg.Module;
+import com.github.unidbg.TraceHook;
 import com.github.unidbg.arm.backend.Unicorn2Factory;
 import com.github.unidbg.linux.android.AndroidEmulatorBuilder;
 import com.github.unidbg.linux.android.AndroidResolver;
@@ -22,11 +23,13 @@ import java.util.List;
 
 public class Fekit extends AbstractJni {
     private static final String TAG = Fekit.class.getSimpleName();
+    public static final String TRACE_OUTPUT_PATH = "unidbg-android/src/test/resources/re/qqsdk/";
     private final AndroidEmulator emulator;
     private final VM vm;
     private final Module modFekit;
     DalvikModule dmFekit;
     PrintStream traceStream = null;
+    private TraceHook traceHook = null;
 
 
     Fekit() {
@@ -42,11 +45,6 @@ public class Fekit extends AbstractJni {
         vm = emulator.createDalvikVM(new File("unidbg-android/src/test/resources/re/qqsdk/com.tencent.mobileqq_v8.9.70.apk"));
         vm.setVerbose(true);
 
-        try {
-            traceStream = new PrintStream(new FileOutputStream("unidbg-android/src/test/resources/re/qqsdk/trace1.log"), false);
-        } catch (FileNotFoundException e) {
-            throw new RuntimeException(e);
-        }
 
 //        String libDir="unidbg-android/src/test/resources/re/sdk29/lib64";
 //        List<String> soList = Arrays.asList(
@@ -73,21 +71,12 @@ public class Fekit extends AbstractJni {
 
         int func_start = 0x62880;
         int func_end = 0x75074;
-
-
-//            emulator.traceCode(dmFekit.getModule().base+func_start,dmFekit.getModule().base+func_end)
-//            emulator.traceCode(dmFekit.getModule().base,dmFekit.getModule().base+dmFekit.getModule().size)
-        emulator.traceCode()
-                .setRedirect(traceStream);
-
-//        emulator.traceCode();
-
     }
 
     @Override
     public DvmObject<?> callStaticObjectMethod(BaseVM vm, DvmClass dvmClass, String signature, VarArg varArg) {
 
-        LogUtil.i("callStaticObjectMethod",String.format("%s %s",signature,varArg));
+        LogUtil.i("callStaticObjectMethod", String.format("%s %s", signature, varArg));
         switch (signature) {
 //            case "android/os/SystemProperties->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;":
 //                System.out.println("android/os/SystemProperties->get " + varArg);
@@ -101,18 +90,17 @@ public class Fekit extends AbstractJni {
     @Override
     public int callIntMethodV(BaseVM vm, DvmObject<?> dvmObject, String signature, VaList vaList) {
 
-        String dvmObjectStr=dvmObject.toString();
-        if(dvmObject.getValue() instanceof String)
-        {
-            dvmObjectStr=(String)dvmObject.getValue();
+        String dvmObjectStr = dvmObject.toString();
+        if (dvmObject.getValue() instanceof String) {
+            dvmObjectStr = (String) dvmObject.getValue();
         }
-        LogUtil.i("callIntMethod",String.format("%s %s %s",signature,dvmObjectStr,vaList.toString()));
+        LogUtil.i("callIntMethod", String.format("%s %s %s", signature, dvmObjectStr, vaList.toString()));
 
         switch (signature) {
             case "java/lang/String->hashCode()I": {
                 String str = (String) dvmObject.getValue();
-                int res= str.hashCode();
-                LogUtil.i(TAG,String.format("hashcode of %s is %d",str,res));
+                int res = str.hashCode();
+                LogUtil.i(TAG, String.format("hashcode of %s is %d", str, res));
                 return res;
             }
 
@@ -120,32 +108,47 @@ public class Fekit extends AbstractJni {
         return super.callIntMethodV(vm, dvmObject, signature, vaList);
     }
 
-    public void callJNI_OnLoad()
-    {
+    public void callJNI_OnLoad() {
+
+        startTrace("trace_jniOnload");
+
+//        emulator.traceCode();
+
         try {
             dmFekit.callJNI_OnLoad(emulator);
         } catch (Exception ex) {
             LogUtil.e(TAG, LogUtil.getStackTraceString(ex));
         }
-        ;   // 调用JNI_OnLoad
-        traceStream.flush();
+        traceHook.stopTrace();
     }
 
-    static void waitCtrlC()
-    {
-        LogUtil.i(TAG,String.format("pid:%s,exec done.press ctrl-c to exit.", ManagementFactory.getRuntimeMXBean().getName().split("@")[0]));
-        while(true)
-        {
+    private void startTrace(String traceName) {
+        try {
+            traceStream = new PrintStream(new FileOutputStream(TRACE_OUTPUT_PATH + traceName), false);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+//            emulator.traceCode(dmFekit.getModule().base+func_start,dmFekit.getModule().base+func_end)
+//            emulator.traceCode(dmFekit.getModule().base,dmFekit.getModule().base+dmFekit.getModule().size)
+        traceHook = emulator.traceCode();
+        traceHook.setRedirect(traceStream);
+    }
+
+    static void waitCtrlC() {
+        LogUtil.i(TAG, String.format("pid:%s,exec done.press ctrl-c to exit.", ManagementFactory.getRuntimeMXBean().getName().split("@")[0]));
+        while (true) {
             Utils.sleep(3000);
         }
     }
+
     public static void main(String[] args) {
         try {
             Fekit fekit = new Fekit();
             fekit.callJNI_OnLoad();
 //            waitCtrlC();
         } catch (Exception ex) {
-            LogUtil.e(TAG, "error on main:"+LogUtil.getStackTraceString(ex));
+            LogUtil.e(TAG, "error on main:" + LogUtil.getStackTraceString(ex));
         }
     }
 }
