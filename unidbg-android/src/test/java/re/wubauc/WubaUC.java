@@ -11,7 +11,6 @@ import com.github.unidbg.linux.android.dvm.*;
 import com.github.unidbg.linux.android.dvm.array.ArrayObject;
 import com.github.unidbg.linux.android.dvm.array.ByteArray;
 import com.github.unidbg.memory.Memory;
-import sun.security.pkcs.ParsingException;
 
 import java.io.File;
 import java.io.IOException;
@@ -73,7 +72,7 @@ public class WubaUC extends AbstractJni implements IOResolver {
     }
 
     @Override
-    public DvmObject<?> callObjectMethod(BaseVM vm, DvmObject<?> dvmObject, String signature, VarArg varArg) throws ParsingException {
+    public DvmObject<?> callObjectMethod(BaseVM vm, DvmObject<?> dvmObject, String signature, VarArg varArg) {
         if ("android/content/Context->getSharedPreferences(Ljava/lang/String;I)Landroid/content/SharedPreferences;".equals(signature)){
             String toString = varArg.getObjectArg(0).getValue().toString();
 
@@ -176,7 +175,7 @@ public class WubaUC extends AbstractJni implements IOResolver {
     }
 
     @Override
-    public DvmObject<?> newObject(BaseVM vm, DvmClass dvmClass, String signature, VarArg varArg) throws ParsingException {
+    public DvmObject<?> newObject(BaseVM vm, DvmClass dvmClass, String signature, VarArg varArg)  {
         if ("java/io/ByteArrayInputStream-><init>([B)V".equals(signature)) {
 
 
