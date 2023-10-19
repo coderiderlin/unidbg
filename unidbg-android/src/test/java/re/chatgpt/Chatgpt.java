@@ -11,11 +11,11 @@ import com.github.unidbg.memory.Memory;
 import re.util.LogUtil;
 import re.util.Utils;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.PrintStream;
+import java.io.*;
 import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Chatgpt extends AbstractJni {
     private static final String TAG = Chatgpt.class.getSimpleName();
@@ -58,7 +58,7 @@ public class Chatgpt extends AbstractJni {
 //            vm.loadLibrary(new File(soPath),false);
 //        }
 
-        dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/chatgpt/ChatGPT_1.2023.284/config.arm64_v8a/lib/arm64-v8a/libpairipcore.so"), false);
+        dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/chatgpt/config.arm64_v8a/lib/arm64-v8a/libpairipcore.so"), false);
         mod = dm.getModule();
         vm.setJni(this);
         // 调用JNI方法
@@ -101,6 +101,49 @@ public class Chatgpt extends AbstractJni {
         return super.callIntMethodV(vm, dvmObject, signature, vaList);
     }
 
+    public void call_StartupLauncher()
+    {
+        //VMRunner.invoke("R2tKgXCxJ05Y6MgT", null);
+//        TraceHook hook = vm.getEmulator().traceCode();
+        VMRunnerInvoke("R2tKgXCxJ05Y6MgT", null);
+//        hook.stopTrace();
+    }
+
+    public Object VMRunnerInvoke(String funcStr, Object[] args) {
+        File ff=new File("unidbg-android/src/test/resources/re/chatgpt/vm/"+funcStr);
+        try {
+            byte[] byteCode = Files.readAllBytes(ff.toPath());
+            return executeVM(byteCode,args);
+        } catch (IOException e) {
+            LogUtil.e(TAG,"load func file error:"+e.getMessage());
+        }
+        return null;
+    }
+    public Object executeVM(byte[] byteCode, Object[] arg){
+
+        DvmClass VmRunner = vm.resolveClass("com.pairip.VMRunner");
+        return VmRunner.callStaticJniMethodObject(emulator,"executeVM([B[Ljava/lang/Object;)Ljava/lang/Object;",byteCode,arg);
+//        LogUtil.i(TAG,"executeVm with code size:"+byteCode.length);
+//        List<Object> list = new ArrayList<>();
+//        list.add(vm.getJavaVM());
+//        list.add(0);
+//
+//        list.add(byteCode);
+//        list.add(arg);
+//
+//        // 参数准备完成
+//        // call function
+//        Number number = mod.callFunction(emulator,
+//                0x521cc,
+//                list.toArray());
+//        LogUtil.i(TAG,"executeVm ret object hash:"+number.intValue());
+//        if(number.intValue()<0)
+//        {
+//            return null;
+//        }
+//        Object result= vm.getObject(number.intValue()).getValue();
+//        return result;
+    }
     public void callJNI_OnLoad() {
 
         startTrace("trace_jniOnload");
@@ -139,6 +182,7 @@ public class Chatgpt extends AbstractJni {
         try {
             Chatgpt me = new Chatgpt();
             me.callJNI_OnLoad();
+            me.call_StartupLauncher();
 //            waitCtrlC();
         } catch (Exception ex) {
             LogUtil.e(TAG, "error on main:" + LogUtil.getStackTraceString(ex));
