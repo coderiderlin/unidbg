@@ -1,9 +1,15 @@
 package re.chatgpt;
 
 import com.github.unidbg.AndroidEmulator;
+import com.github.unidbg.Emulator;
 import com.github.unidbg.Module;
 import com.github.unidbg.TraceHook;
+import com.github.unidbg.arm.HookStatus;
 import com.github.unidbg.arm.backend.Unicorn2Factory;
+import com.github.unidbg.debugger.Debugger;
+import com.github.unidbg.hook.HookContext;
+import com.github.unidbg.hook.ReplaceCallback;
+import com.github.unidbg.hook.hookzz.Dobby;
 import com.github.unidbg.linux.android.AndroidEmulatorBuilder;
 import com.github.unidbg.linux.android.AndroidResolver;
 import com.github.unidbg.linux.android.dvm.*;
@@ -14,10 +20,8 @@ import re.util.Utils;
 import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
 
-public class Chatgpt extends AbstractJni {
+public class Chatgpt  {
     private static final String TAG = Chatgpt.class.getSimpleName();
     public static final String TRACE_OUTPUT_PATH = "unidbg-android/src/test/resources/re/chatgpt/";
     private final AndroidEmulator emulator;
@@ -39,7 +43,11 @@ public class Chatgpt extends AbstractJni {
         memory.setLibraryResolver(new AndroidResolver(23));
         // 创建Android虚拟机,传入APK,Unidbg可以替我们做部分签名校验的工作
         vm = emulator.createDalvikVM(new File("unidbg-android/src/test/resources/re/chatgpt/ChatGPT_1.2023.284/com.openai.chatgpt.apk"));
+        vm.setJni(new JniHandler());
+        emulator.getSyscallHandler().addIOResolver(new FileHandler());
         vm.setVerbose(true);
+        emulator.getSyscallHandler().setVerbose(true);
+
 
 
 //        String libDir="unidbg-android/src/test/resources/re/sdk29/lib64";
@@ -60,46 +68,11 @@ public class Chatgpt extends AbstractJni {
 
         dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/chatgpt/config.arm64_v8a/lib/arm64-v8a/libpairipcore.so"), false);
         mod = dm.getModule();
-        vm.setJni(this);
         // 调用JNI方法
 //        emulator.traceCode(dmFekit.getModule().base,dmFekit.getModule().base+dmFekit.getModule().size);
 
     }
 
-    @Override
-    public DvmObject<?> callStaticObjectMethod(BaseVM vm, DvmClass dvmClass, String signature, VarArg varArg) {
-
-        LogUtil.i("callStaticObjectMethod", String.format("%s %s", signature, varArg));
-        switch (signature) {
-//            case "android/os/SystemProperties->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;":
-//                System.out.println("android/os/SystemProperties->get " + varArg);
-//                return new StringObject(vm, "705KPGS001091");
-//            case "android/app/ActivityThread-&gt;currentActivityThread()Landroid/app/ActivityThread;":
-//                return vm.resolveClass("android/app/ActivityThread").newObject(null);
-        }
-        return super.callStaticObjectMethod(vm, dvmClass, signature, varArg);
-    }
-
-    @Override
-    public int callIntMethodV(BaseVM vm, DvmObject<?> dvmObject, String signature, VaList vaList) {
-
-        String dvmObjectStr = dvmObject.toString();
-        if (dvmObject.getValue() instanceof String) {
-            dvmObjectStr = (String) dvmObject.getValue();
-        }
-        LogUtil.i("callIntMethod", String.format("%s %s %s", signature, dvmObjectStr, vaList.toString()));
-
-        switch (signature) {
-            case "java/lang/String->hashCode()I": {
-                String str = (String) dvmObject.getValue();
-                int res = str.hashCode();
-                LogUtil.i(TAG, String.format("hashcode of %s is %d", str, res));
-                return res;
-            }
-
-        }
-        return super.callIntMethodV(vm, dvmObject, signature, vaList);
-    }
 
     public void call_StartupLauncher()
     {
@@ -181,7 +154,30 @@ public class Chatgpt extends AbstractJni {
     public static void main(String[] args) {
         try {
             Chatgpt me = new Chatgpt();
+
+            Dobby dobby = Dobby.getInstance(me.emulator);
+            dobby.replace(me.mod.base+0x3f300, new ReplaceCallback() { // decStdString
+                //                @Override
+//                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
+////                    System.out.println("decStdString.onCall arg0=" + context.getIntArg(0));
+//                    return HookStatus.RET(emulator, originFunction);
+//                }
+                @Override
+                public void postCall(Emulator<?> emulator, HookContext context) {
+                    LogUtil.i(TAG,String.format("decStdString at %08X :%s",context.getLR(), context.getPointerArg(0).getPointer(0).getString(0)));
+                }
+            }, true);
+
+
             me.callJNI_OnLoad();
+
+            LogUtil.e(TAG,"calling startupLauncher..");
+            Debugger dbg = me.emulator.attach();
+//            dbg.addBreakPoint(me.mod,0x364c0);
+//            dbg.addBreakPoint(me.mod,0x3e8fc);
+
+
+
             me.call_StartupLauncher();
 //            waitCtrlC();
         } catch (Exception ex) {

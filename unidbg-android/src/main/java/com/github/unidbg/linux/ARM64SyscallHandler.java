@@ -1121,6 +1121,8 @@ public class ARM64SyscallHandler extends AndroidSyscallHandler {
     private static final int PR_SET_PTRACER = 0x59616d61;
 
     private int prctl(Emulator<?> emulator) {
+        final int PR_SET_MM_START_DATA=3;
+        final int PR_SET_MM_END_DATA=4;
         RegisterContext context = emulator.getContext();
         int option = context.getIntArg(0);
         long arg2 = context.getLongArg(1);
@@ -1150,6 +1152,9 @@ public class ARM64SyscallHandler extends AndroidSyscallHandler {
                 return 0;
             case PR_SET_NO_NEW_PRIVS:
             case PR_SET_THP_DISABLE:
+
+            case PR_SET_MM_START_DATA:
+            case PR_SET_MM_END_DATA:
                 return 0;
         }
         throw new UnsupportedOperationException("option=" + option);
