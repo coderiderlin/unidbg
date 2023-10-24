@@ -66,7 +66,7 @@ public class Chatgpt  {
 //            vm.loadLibrary(new File(soPath),false);
 //        }
 
-        dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/chatgpt/config.arm64_v8a/lib/arm64-v8a/libpairipcore.so"), false);
+        dm = vm.loadLibrary(new File("unidbg-android/src/test/resources/re/chatgpt/ChatGPT_1.2023.284/config.arm64_v8a/lib/arm64-v8a/libpairipcore.so"), false);
         mod = dm.getModule();
         // 调用JNI方法
 //        emulator.traceCode(dmFekit.getModule().base,dmFekit.getModule().base+dmFekit.getModule().size);
@@ -78,12 +78,13 @@ public class Chatgpt  {
     {
         //VMRunner.invoke("R2tKgXCxJ05Y6MgT", null);
 //        TraceHook hook = vm.getEmulator().traceCode();
-        VMRunnerInvoke("R2tKgXCxJ05Y6MgT", null);
+        VMRunnerInvoke("gBLSES2bZk2l9pzz", null); //1.2023.284
+//        VMRunnerInvoke("R2tKgXCxJ05Y6MgT", null); //1.2023.281
 //        hook.stopTrace();
     }
 
     public Object VMRunnerInvoke(String funcStr, Object[] args) {
-        File ff=new File("unidbg-android/src/test/resources/re/chatgpt/vm/"+funcStr);
+        File ff=new File("unidbg-android/src/test/resources/re/chatgpt/vm/1.2023.284/"+funcStr);
         try {
             byte[] byteCode = Files.readAllBytes(ff.toPath());
             return executeVM(byteCode,args);
@@ -156,7 +157,9 @@ public class Chatgpt  {
             Chatgpt me = new Chatgpt();
 
             Dobby dobby = Dobby.getInstance(me.emulator);
-            dobby.replace(me.mod.base+0x3f300, new ReplaceCallback() { // decStdString
+//            long offset_decStdStr=0x3f300; //1.2023.281
+            long offset_decStdStr=0x3f274; //1.2023.284
+            dobby.replace(me.mod.base+offset_decStdStr, new ReplaceCallback() { // decStdString
                 //                @Override
 //                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
 ////                    System.out.println("decStdString.onCall arg0=" + context.getIntArg(0));
