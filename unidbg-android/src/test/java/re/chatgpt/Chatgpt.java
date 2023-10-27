@@ -14,6 +14,7 @@ import com.github.unidbg.linux.android.AndroidEmulatorBuilder;
 import com.github.unidbg.linux.android.AndroidResolver;
 import com.github.unidbg.linux.android.dvm.*;
 import com.github.unidbg.memory.Memory;
+import com.github.unidbg.pointer.UnidbgPointer;
 import re.util.LogUtil;
 import re.util.Utils;
 
@@ -21,7 +22,7 @@ import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 
-public class Chatgpt  {
+public class Chatgpt {
     private static final String TAG = Chatgpt.class.getSimpleName();
     public static final String TRACE_OUTPUT_PATH = "unidbg-android/src/test/resources/re/chatgpt/";
     private final AndroidEmulator emulator;
@@ -49,7 +50,6 @@ public class Chatgpt  {
         emulator.getSyscallHandler().setVerbose(true);
 
 
-
 //        String libDir="unidbg-android/src/test/resources/re/sdk29/lib64";
 //        List<String> soList = Arrays.asList(
 ////                "libc.so",
@@ -74,8 +74,7 @@ public class Chatgpt  {
     }
 
 
-    public void call_StartupLauncher()
-    {
+    public void call_StartupLauncher() {
         //VMRunner.invoke("R2tKgXCxJ05Y6MgT", null);
 //        TraceHook hook = vm.getEmulator().traceCode();
         VMRunnerInvoke("gBLSES2bZk2l9pzz", null); //1.2023.284
@@ -84,19 +83,20 @@ public class Chatgpt  {
     }
 
     public Object VMRunnerInvoke(String funcStr, Object[] args) {
-        File ff=new File("unidbg-android/src/test/resources/re/chatgpt/vm/1.2023.284/"+funcStr);
+        File ff = new File("unidbg-android/src/test/resources/re/chatgpt/vm/1.2023.284/" + funcStr);
         try {
             byte[] byteCode = Files.readAllBytes(ff.toPath());
-            return executeVM(byteCode,args);
+            return executeVM(byteCode, args);
         } catch (IOException e) {
-            LogUtil.e(TAG,"load func file error:"+e.getMessage());
+            LogUtil.e(TAG, "load func file error:" + e.getMessage());
         }
         return null;
     }
-    public Object executeVM(byte[] byteCode, Object[] arg){
+
+    public Object executeVM(byte[] byteCode, Object[] arg) {
 
         DvmClass VmRunner = vm.resolveClass("com.pairip.VMRunner");
-        return VmRunner.callStaticJniMethodObject(emulator,"executeVM([B[Ljava/lang/Object;)Ljava/lang/Object;",byteCode,arg);
+        return VmRunner.callStaticJniMethodObject(emulator, "executeVM([B[Ljava/lang/Object;)Ljava/lang/Object;", byteCode, arg);
 //        LogUtil.i(TAG,"executeVm with code size:"+byteCode.length);
 //        List<Object> list = new ArrayList<>();
 //        list.add(vm.getJavaVM());
@@ -118,6 +118,7 @@ public class Chatgpt  {
 //        Object result= vm.getObject(number.intValue()).getValue();
 //        return result;
     }
+
     public void callJNI_OnLoad() {
 
         startTrace("trace_jniOnload");
@@ -156,29 +157,64 @@ public class Chatgpt  {
         try {
             Chatgpt me = new Chatgpt();
 
+            Debugger dbg = me.emulator.attach();
+
             Dobby dobby = Dobby.getInstance(me.emulator);
 //            long offset_decStdStr=0x3f300; //1.2023.281
-            long offset_decStdStr=0x3f274; //1.2023.284
-            dobby.replace(me.mod.base+offset_decStdStr, new ReplaceCallback() { // decStdString
-                //                @Override
-//                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
-////                    System.out.println("decStdString.onCall arg0=" + context.getIntArg(0));
-//                    return HookStatus.RET(emulator, originFunction);
-//                }
+            long offset_decStdStr = 0x3f274; //1.2023.284
+//            dbg.addBreakPoint(me.mod.base+0x3F344);
+            dobby.replace(me.mod.base + offset_decStdStr, new ReplaceCallback() { // decStdString
+                @Override
+                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
+                    UnidbgPointer outStdStr =context.getPointerArg(0);
+                    context.push(outStdStr);
+                    return HookStatus.RET(emulator, originFunction);
+                }
+
                 @Override
                 public void postCall(Emulator<?> emulator, HookContext context) {
-                    LogUtil.i(TAG,String.format("decStdString at %08X :%s",context.getLR(), context.getPointerArg(0).getPointer(0).getString(0)));
+                    UnidbgPointer outStdStr=context.pop();
+                    int mode=outStdStr.getByte(0)&1; //1 denote std::string in long mode else in short mode
+                    String str="";
+                    if(mode==1)str=outStdStr.getPointer(8*2).getString(0);
+                    else str=outStdStr.getString(1);
+
+                    LogUtil.i(TAG, String.format("dec std::string -> mod:%d %s", mode,str));
                 }
             }, true);
 
 
+            dobby.replace(me.mod.base + 0x13A10, new ReplaceCallback() { // def_syscall
+                @Override
+                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
+                    LogUtil.i(TAG, "on def_syscall");
+                    return HookStatus.RET(emulator, originFunction);
+                }
+            }, false);
+
+
+            dobby.replace(me.mod.base + 0x4077c, new ReplaceCallback() { // guess_anti
+                @Override
+                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
+                    LogUtil.i(TAG, "on guess_anti");
+                    return HookStatus.RET(emulator, originFunction);
+                }
+            }, false);
+
+
+            dobby.replace(me.mod.base + 0x4AC6c, new ReplaceCallback() { // FindClass err
+                @Override
+                public HookStatus onCall(Emulator<?> emulator, HookContext context, long originFunction) {
+                    LogUtil.i(TAG, String.format("on FindClass err x8:%08x", context.getLongByReg(8)));
+                    return HookStatus.RET(emulator, originFunction);
+                }
+            }, false);
+
             me.callJNI_OnLoad();
 
-            LogUtil.e(TAG,"calling startupLauncher..");
-            Debugger dbg = me.emulator.attach();
+            LogUtil.e(TAG, "calling startupLauncher..");
 //            dbg.addBreakPoint(me.mod,0x364c0);
 //            dbg.addBreakPoint(me.mod,0x3e8fc);
-
 
 
             me.call_StartupLauncher();
