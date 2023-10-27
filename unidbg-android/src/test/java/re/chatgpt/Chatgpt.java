@@ -21,6 +21,9 @@ import re.util.Utils;
 import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Chatgpt {
     private static final String TAG = Chatgpt.class.getSimpleName();
@@ -154,8 +157,17 @@ public class Chatgpt {
     }
 
     public static void main(String[] args) {
+        PrintStream streamTrace = null;
+        try {
+            streamTrace = new PrintStream(new FileOutputStream("unidbg-android/src/test/resources/re/chatgpt/trace.log", true));
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+
         try {
             Chatgpt me = new Chatgpt();
+
 
             Debugger dbg = me.emulator.attach();
 
@@ -216,11 +228,31 @@ public class Chatgpt {
 //            dbg.addBreakPoint(me.mod,0x364c0);
 //            dbg.addBreakPoint(me.mod,0x3e8fc);
 
+// Trace range
+            List<List<Long>> ranges = Arrays.asList(
+                    Arrays.asList(0x3F274L, 0x3F364L - 4L) // executeVM
+            );
+
+            TraceHook traceHook = me.emulator.traceCode();
+            traceHook.setRedirect(streamTrace);
+//
+//            List<TraceHook> traceHooks = new ArrayList<>();
+//            for (List<Long> range : ranges) {
+////                TraceHook traceHook = me.emulator.traceCode(me.mod.base + range.get(0), me.mod.base + range.get(1));
+////                traceHook.setRedirect(streamTrace);
+//                traceHooks.add(traceHook);
+//            }
+
 
             me.call_StartupLauncher();
+
+            LogUtil.e(TAG,"test end.");
 //            waitCtrlC();
         } catch (Exception ex) {
             LogUtil.e(TAG, "error on main:" + LogUtil.getStackTraceString(ex));
         }
+
+        streamTrace.flush();
+        streamTrace.close();
     }
 }
